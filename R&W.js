@@ -1,77 +1,95 @@
-db.createCollection("crime_incidents")
+const mongoose = require('mongoose');
+const connectDB = require('./db'); // Assuming db.js exports the connectDB function
 
-// This can change
-earliestDate = ISODate("1964-09-28T00:00:00Z")
+connectDB();
 
-function insertCrimeIncident(
-    crime_id, crime_type, date, description,
-    location, loc_type, coordinates, neighborhood, reported_by
-) {
-    db.crime_incidents.insert({
-        "crime_id": crime_id,
-        "crime_type": crime_type,
-        "date": date,
-        "description": description,
-        "location": {"type": loc_type, "coordinates": coordinates},
-        "neighborhood": neighborhood,
-        "reported_by": reported_by
-    })
+// Define a Mongoose schema and model
+const crimeIncidentSchema = new mongoose.Schema({
+    crime_id: String,
+    crime_type: String,
+    date: Date,
+    description: String,
+    location: {
+        type: { location_type: String, enum: ['Point']}, // GeoJSON type
+        coordinates: { type: [Number] } // Array of numbers
+    },
+    neighborhood: String,
+    reported_by: String
+});
 
-    db.crime_incidents.createIndex({ "location": "2dsphere" })
+// Create a model for the crime incidents
+const CrimeIncident = mongoose.model('CrimeIncident', crimeIncidentSchema);
+
+// Create a collection for crime incidents
+async function createCrimeCollection() {
+    await db.createCollection("crime_incidents");
+    console.log("Collection 'crime_incidents' created");
+}
+
+// Insert a crime incident
+async function insertCrimeIncident(crime_id, crime_type, date, description, loc_type, coordinates, neighborhood, reported_by) {
+    const incident = new CrimeIncident({
+        crime_id,
+        crime_type,
+        date,
+        description,
+        location: { location_type: loc_type, coordinates },
+        neighborhood,
+        reported_by
+    });
+
+    await incident.save(); // Use Mongoose to save the document
+    console.log("Crime incident inserted");
 }
 
 // Returns all records within a given radius from a given point
 // (and potentially within a given time interval)
-function recordsWithinRadius(point, radius, startDate=earliestDate, endDate=ISODate()) {
-    records = db.crime_incidents.find({
+async function recordsWithinRadius(point, radius, startDate = new Date('1964-09-28T00:00:00Z'), endDate = new Date()) {
+    const records = await CrimeIncident.find({
         location: {
             $near: {
                 $geometry: { type: "Point", coordinates: point },
-                $maxDistance: radius // distance in meters
+                $maxDistance: radius
             }
         },
-
         date: {
             $gte: startDate,
             $lte: endDate
         }
-    })
+    }).toArray();
 
-    return records
+    return records;
 }
 
 // Returns all records within a given geospatial polygon
 // (and potentially within a given time interval)
-function recordsWithinPolygon(coordinateList, startDate=earliestDate, endDate=ISODate()) {
-    records = db.crime_incidents.find({
+async function recordsWithinPolygon(coordinateList, startDate = new Date('1964-09-28T00:00:00Z'), endDate = new Date()) {
+    const records = await CrimeIncident.find({
         location: {
             $geoWithin: {
                 $geometry: {
                     type: "Polygon",
-                    coordinates: [
-                        [coordinateList]
-                    ]
+                    coordinates: [coordinateList]
                 }
             }
         },
-
         date: {
             $gte: startDate,
             $lte: endDate
         }
-    })
+    }).toArray();
 
-    return records
+    return records;
 }
 
 // Returns all records within a given time interval
-function recordsWithinTime(startDate, endDate) {
-    records = db.crime_incidents.find({
+async function recordsWithinTime(startDate, endDate) {
+    const records = await CrimeIncident.find({
         date: {
             $gte: startDate,
             $lte: endDate
         }
-    })
+    }).toArray();
 
-    return records
+    return records;
 }
