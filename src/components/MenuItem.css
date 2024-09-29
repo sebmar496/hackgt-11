@@ -1,0 +1,36 @@
+.menu-item {
+    padding: 15px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    position: relative;
+  }
+  
+  .menu-item span.time {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 12px;
+    color: #666;
+  }
+  
+  .menu-item p {
+    font-size: 14px;
+    color: #333;
+  }
+  
+  /* Menu item colors */
+  .menu-item.yellow {
+    background-color: #fff4d1;
+    border-left: 5px solid #ffcc00;
+  }
+  
+  .menu-item.red {
+    background-color: #ffe5e5;
+    border-left: 5px solid #ff4c4c;
+  }
+  
+  .menu-item.green {
+    background-color: #e6ffea;
+    border-left: 5px solid #00c851;
+  }
+  
