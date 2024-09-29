@@ -75,35 +75,30 @@ const logoStyles = {
 
 const bottomBarStyles = {
   position: "absolute",
-  bottom: `env(safe-area-inset-bottom, 0)`, // Ensure it's above the home indicator
+  bottom: "0px",
   left: "0px",
   width: "100vw",
   backgroundColor: "rgba(255, 255, 255, 0.9)",
   padding: "10px",
   textAlign: "center",
   boxShadow: "0px -2px 10px rgba(0, 0, 0, 0.2)",
-  zIndex: 1000, // Ensure it is above other elements
 };
 
 const notificationStyles = {
-  position: "fixed",  // Use fixed to keep it in the middle while scrolling
-  top: "50%",         // Center vertically
-  left: "50%",        // Center horizontally
-  transform: "translate(-50%, -50%)",  // Move it back by half its size to perfectly center
+  position: "absolute",
+  bottom: "50%",
+  left: "50%",
+  transform: "translateX(-50%)",
   backgroundColor: "white",
   borderRadius: "10px",
   boxShadow: "0px 0px 10px rgba(0, 0, 0, 0.5)",
   padding: "15px",
-  zIndex: 1000,       // Ensure it's on top of other elements
+  zIndex: 1000,
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
   gap: "10px",
-  maxWidth: "calc(100% - 40px)", // Prevent overflow on the sides
-  boxSizing: "border-box",       // Include padding in width calculation
 };
-
-
 
 const dropdownMenuStyles = {
   position: "absolute",
@@ -154,24 +149,29 @@ const MapComponent = () => {
   const [opacity, setOpacity] = useState(0.6); // Default opacity
 
   // Fetch and parse geofence/crime data from CSV
-  const fetchCrimeData = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/crime-data'); // Assuming backend is running on port 5000
-      const data = await response.json();
-
-      // Map crime data to LatLng objects for Google Maps Heatmap
-      const crimePoints = data.map((crime) => {
-        return new window.google.maps.LatLng(crime.lat, crime.long);
-      });
-
-      setHeatmapData(crimePoints);
-    } catch (error) {
-      console.error('Error fetching crime data:', error);
-    }
+  const parseCrimeData = () => {
+    Papa.parse(csvData, {
+      download: true,
+      header: true,
+      complete: (result) => {
+        const parsedData = result.data.map(row => {
+          const lat = parseFloat(row.lat);
+          const lng = parseFloat(row.long);
+          if (!isNaN(lat) && !isNaN(lng) && window.google && window.google.maps) {
+            return new window.google.maps.LatLng(lat, lng);
+          }
+          return null;
+        }).filter(point => point !== null);
+        setHeatmapData(parsedData);
+      },
+      error: (error) => {
+        console.error('Error parsing CSV:', error);
+      }
+    });
   };
 
   useEffect(() => {
-    fetchCrimeData(); // Parse CSV to get crime data when the component loads
+    parseCrimeData(); // Parse CSV to get crime data when the component loads
 
     // Use Geolocation API to get the user's location
     if (navigator.geolocation) {
@@ -275,31 +275,29 @@ const MapComponent = () => {
   };
 
   // Check if the user's location is within any geofence
-  // Check if the user's location is within any geofence
-  const showNotification = () => {
-    setNotificationVisible(true);
-
-    // Hide notification after 30 seconds
-    setTimeout(() => {
-      setNotificationVisible(false);
-    }, 30000);
-  };
-
-  // Example usage of the notification in a danger zone check
-  const checkIfInDangerZone = () => {
-    if (window.google && window.google.maps && window.google.maps.geometry) {
-      geofences.forEach((geofence) => {
-        const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
-          new window.google.maps.LatLng(userLocation.lat, userLocation.lng),
-          new window.google.maps.LatLng(geofence.lat, geofence.lng)
-        );
-        if (distance <= geofence.radius) {
-          showNotification(); // Show the notification
+const checkIfInDangerZone = () => {
+  // Ensure google.maps is loaded before using it
+  if (window.google && window.google.maps && window.google.maps.geometry) {
+    geofences.forEach((geofence) => {
+      const distance = window.google.maps.geometry.spherical.computeDistanceBetween(
+        new window.google.maps.LatLng(userLocation.lat, userLocation.lng),
+        new window.google.maps.LatLng(geofence.lat, geofence.lng)
+      );
+      if (distance <= geofence.radius) {
+        // Show notification and vibrate the device
+        setNotificationVisible(true);
+        if (navigator.vibrate) {
+          navigator.vibrate(1000); // Vibrate for 1 second
         }
-      });
-    }
-  };
 
+        // Hide notification after 30 seconds
+        setTimeout(() => {
+          setNotificationVisible(false);
+        }, 30000); // 30,000 milliseconds = 30 seconds
+      }
+    });
+  }
+};
 
   // Test button to simulate entering a dangerous zone
   const triggerTestNotification = () => {
@@ -307,9 +305,10 @@ const MapComponent = () => {
     if (navigator.vibrate) {
       navigator.vibrate(1000); // Vibrate for 1 second
     }
+
     setTimeout(() => {
       setNotificationVisible(false);
-    }, 10000);
+    }, 5000); // 30,000 milliseconds = 30 seconds
   };
 
   // Automatically check if in a danger zone when location changes
